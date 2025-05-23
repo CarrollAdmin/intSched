@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: slurmd-ethernet
+  namespace: slurm
+spec:
+  type: ClusterIP
+  ports:
+  - port: 22
+  selector:
+    app: slurmd
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: slurmd-ethernet
+  namespace: slurm
+  labels:
+    app: slurmd
+spec:
+  selector:
+    matchLabels:
+      app: slurmd
+  template:
+    metadata:
+      labels:
+        app: slurmd
+    spec:
+      containers:
+      - image: ${IMAGE_TAG}
+        imagePullPolicy: ${imagePullPolicy}
+        volumeMounts:
+        - name: shared-data
+          mountPath: /nfs
+        - name: dshm  
+          mountPath: /dev/shm
+        - name: host-cgroup-root
+          mountPath: /host-cgroup/ 
+        name: slurmd-ethernet
+        ports:
+        - containerPort: 22
+        env:
+        - name: OMPI_ALLOW_RUN_AS_ROOT
+          value: "1"
+        - name: OMPI_ALLOW_RUN_AS_ROOT_CONFIRM
+          value: "1"
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: "none"
+        # Create the hostfile (arguments: <app label> <network prefix> <slots per node>)
+        args: ["/root/start.sh", "slurmd", "128", "slurm"]
+        securityContext:
+          privileged: true
+          capabilities:
+            add:
+              - NET_ADMIN
+            add: ["IPC_LOCK"]
+      nodeSelector:
+        mpi: "1"  
+      volumes:
+        - name: shared-data
+          hostPath:
+            path: ${NFS_PATH}    
+        - name: dshm
+          emptyDir:
+            medium: Memory
+        - name: host-cgroup-root
+          hostPath:
+            path: /sys/fs/cgroup/
+            type: ""
+---

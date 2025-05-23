@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: xsched
+  namespace: slurm
+spec:
+  type: ClusterIP
+  ports:
+  - port: 22
+  selector:
+    app: xsched
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xsched
+  namespace: slurm
+  labels:
+    app: xsched
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xsched
+  template:
+    metadata:
+      labels:
+        app: xsched
+    spec:
+      containers:
+      - image: ${xsched_IMAGE_TAG}
+        imagePullPolicy: ${imagePullPolicy}
+        name: xsched
+        ports:
+        - containerPort: 22
+        env:
+        - name: OMPI_ALLOW_RUN_AS_ROOT
+          value: "1"
+        - name: OMPI_ALLOW_RUN_AS_ROOT_CONFIRM
+          value: "1"
+        # Create the hostfile (arguments: <app label> <network prefix> <slots per node>)
+        command: ['/bin/sh', './xsched_init_command.sh']
+        securityContext:
+          privileged: true
+          capabilities:
+            add:
+              - NET_ADMIN
+            add: ["IPC_LOCK"]     
